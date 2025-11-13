@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DataType {
+  HISTORY
+  FORECAST
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Hotel {
+  id                  String   @id @default(uuid())
+  name                String
+  email               String   @unique
+  totalAvailableRooms Int      @default(0)  // Total room inventory
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  snapshots HistoryForecastSnapshot[]
+  data     HistoryForecastData[]
+
+  @@map("hotels")
+}
+
+model ProcessedEmail {
+  id          String   @id @default(uuid())
+  messageId   String   @unique
+  subject     String
+  sender      String
+  receivedAt  DateTime
+  processedAt DateTime @default(now())
+  fileHash    String
+
+  @@index([messageId])
+  @@index([fileHash])
+  @@map("processed_emails")
+}
+
+model HistoryForecastSnapshot {
+  id                         String           @id @default(uuid())
+  hotelId                    String
+  snapshotTime               DateTime
+  originalFilename           String
+  blobUrl                    String
+  fileHash                   String           @unique
+  totalAvailableRoomsSnapshot Int            // Rooms at calculation time
+  uploadedAt                 DateTime         @default(now())
+  processed                  Boolean          @default(false)
+  processingStatus           ProcessingStatus @default(PENDING)
+  processingError            String?          @db.Text
+  rowCount                   Int?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+
+  hotel Hotel                   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  data  HistoryForecastData[]
+
+  @@index([hotelId, snapshotTime])
+  @@index([fileHash])
+  @@index([processed])
+  @@index([processingStatus])
+  @@map("history_forecast_snapshots")
+}
+
+model HistoryForecastData {
+  id         String   @id @default(uuid())
+  snapshotId String
+  hotelId    String   // Denormalized for better query performance and partitioning
+  stayDate   DateTime @db.Date
+  dataType   DataType
+
+  // 5 EXTRACTED columns from file
+  roomNights  Int              // Column 3: Room nights sold
+  roomRevenue Decimal  @db.Decimal(12, 2)  // Column 10: Room revenue
+  ooRooms     Int              // Column 15: Out of order rooms
+
+  // 3 CALCULATED metrics (indexed for queries)
+  occupancyPercent Decimal  @db.Decimal(5, 2)   // (roomNights / totalAvailable) * 100
+  adr              Decimal  @db.Decimal(10, 2)  // roomRevenue / roomNights
+  revPAR           Decimal  @db.Decimal(10, 2)  // roomRevenue / totalAvailable
+
+  rowIndex  Int
+  createdAt DateTime @default(now())
+
+  snapshot HistoryForecastSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  hotel    Hotel                   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, stayDate, dataType])
+  @@index([snapshotId, stayDate])
+  @@index([hotelId, stayDate])      // Critical composite index for time-travel queries
+  @@index([stayDate])                // For partitioning key
+  @@index([dataType])
+  @@index([occupancyPercent])        // For filtering/sorting (only on active partitions)
+  @@index([adr])                     // For filtering/sorting (only on active partitions)
+  @@index([revPAR])                  // For filtering/sorting (only on active partitions)
+  @@map("history_forecast_data")
+}
+
