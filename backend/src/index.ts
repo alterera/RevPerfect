@@ -1,8 +1,36 @@
+import express from 'express';
 import { config } from './config/index.js';
 import { prisma } from './utils/prisma.js';
 import { blobStorageService } from './services/blobStorage.service.js';
 import { emailService } from './services/email.service.js';
 import { startScheduler, stopScheduler } from './jobs/scheduler.js';
+import apiRoutes from './routes/api.js';
+
+// Create Express app
+const app = express();
+const API_PORT = process.env.API_PORT || 3001;
+
+// Middleware
+app.use(express.json());
+app.use((req, res, next) => {
+  // Simple CORS for prototype (allow all origins)
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  next();
+});
+
+// API routes
+app.use('/api', apiRoutes);
+
+// Health check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 /**
  * Initialize the application
@@ -38,7 +66,15 @@ async function initialize(): Promise<void> {
     console.log(`  - Cron Schedule: ${config.scheduler.emailCheckCron}`);
     console.log('');
 
-    // Step 5: Start the scheduler
+    // Step 5: Start the API server
+    app.listen(API_PORT, () => {
+      console.log(`🌐 API server running on http://localhost:${API_PORT}`);
+      console.log(`   Health check: http://localhost:${API_PORT}/health`);
+      console.log(`   API routes: http://localhost:${API_PORT}/api`);
+      console.log('');
+    });
+
+    // Step 6: Start the scheduler
     startScheduler();
 
     console.log('='.repeat(80));
