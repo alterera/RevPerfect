@@ -261,8 +261,8 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const roomsMTD1 = mtdData1.reduce((sum, row) => sum + Number(row.roomNights), 0);
     const revenueMTD1 = mtdData1.reduce((sum, row) => sum + Number(row.roomRevenue), 0);
     const adrMTD1 = roomsMTD1 > 0 ? revenueMTD1 / roomsMTD1 : 0;
-    const totalRooms1 = snapshot1.totalAvailableRoomsSnapshot || 0;
-    const occupancyMTD1 = totalRooms1 > 0 ? (roomsMTD1 / totalRooms1) * 100 : 0;
+    // const totalRooms1 = snapshot1.totalAvailableRoomsSnapshot || 0;
+    // const occupancyMTD1 = totalRooms1 > 0 ? (roomsMTD1 / totalRooms1) * 100 : 0;
 
     // Calculate MTD metrics for snapshot2
     const roomsMTD2 = mtdData2.reduce((sum, row) => sum + Number(row.roomNights), 0);
@@ -494,7 +494,7 @@ router.get('/pickup/:hotelId/daily', async (req, res) => {
     const dailyPickup = Array.from(allDates)
       .sort()
       .map((dateStr) => {
-        const date = new Date(dateStr);
+        // const date = new Date(dateStr);
         const d1 = data1Map.get(dateStr);
         const d2 = data2Map.get(dateStr);
 
@@ -627,7 +627,7 @@ router.get('/comparison/:hotelId/actual-vs-snapshot', async (req, res) => {
     const dailyComparison = Array.from(allDates)
       .sort()
       .map((dateStr) => {
-        const date = new Date(dateStr);
+        // const date = new Date(dateStr);
         const seed = seedMap.get(dateStr);
         const comp = comparisonMap.get(dateStr);
 
@@ -763,7 +763,7 @@ router.get('/comparison/:hotelId/stly', async (req, res) => {
     const stlyComparison = Array.from(allDates)
       .sort()
       .map((dateStr) => {
-        const date = new Date(dateStr);
+        // const date = new Date(dateStr);
         const stly = stlyMap.get(dateStr);
         const latest = latestMap.get(dateStr);
 
