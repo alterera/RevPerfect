@@ -1,16 +1,17 @@
-import pkg from '@prisma/client';
-import type { PrismaClient as PrismaClientType } from '@prisma/client';
+import { createRequire } from 'module';
+import type { PrismaClient } from '@prisma/client';
 
-const { PrismaClient } = pkg;
+const require = createRequire(import.meta.url);
+const { PrismaClient: PrismaClientConstructor } = require('@prisma/client');
 
 // Singleton pattern for Prisma Client
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClientType;
+  prisma?: PrismaClient;
 };
 
-export const prisma =
+export const prisma: PrismaClient =
   globalForPrisma.prisma ??
-  new PrismaClient({
+  new PrismaClientConstructor({
     log:
       process.env.NODE_ENV === 'development'
         ? ['query', 'error', 'warn']

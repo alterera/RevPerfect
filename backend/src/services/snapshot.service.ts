@@ -1,10 +1,14 @@
 import { prisma } from '../utils/prisma.js';
-import { Prisma } from '@prisma/client';
+import { createRequire } from 'module';
 import type { ParsedRow, SnapshotMetadata } from '../types/fileProcessor.types.js';
 import type {
   HistoryForecastSnapshot,
   HistoryForecastData,
 } from '@prisma/client';
+
+// Use createRequire for CommonJS Prisma in ESM
+const require = createRequire(import.meta.url);
+const { Prisma } = require('@prisma/client');
 
 class SnapshotService {
   /**
