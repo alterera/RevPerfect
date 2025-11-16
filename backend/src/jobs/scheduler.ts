@@ -1,11 +1,9 @@
 import cron from 'node-cron';
 import { config } from '../config/index.js';
 import { processEmails } from './emailWatcher.job.js';
-import { partitionManagerService } from '../services/partitionManager.service.js';
 
 // Job locks to prevent overlapping runs
 let isRunning = false;
-let isPartitionJobRunning = false;
 
 /**
  * Start the email watcher scheduler
@@ -47,61 +45,7 @@ export function startScheduler(): void {
     }
   });
 
-  // Schedule partition management jobs
-  schedulePartitionManagement();
-
   console.log('✓ Scheduler started successfully\n');
-}
-
-/**
- * Schedule partition management jobs
- * - Creates future partitions monthly (1st of each month at 2 AM)
- * - Archives completed months monthly (1st of each month at 3 AM)
- */
-function schedulePartitionManagement(): void {
-  // Create future partitions on the 1st of each month at 2 AM
-  cron.schedule('0 2 1 * *', async () => {
-    if (isPartitionJobRunning) {
-      console.log('⚠ Partition job already running, skipping...');
-      return;
-    }
-
-    isPartitionJobRunning = true;
-
-    try {
-      console.log('\n📅 Running partition management job...');
-      await partitionManagerService.createFuturePartitions(3);
-      console.log('✓ Partition management completed\n');
-    } catch (error) {
-      console.error('Error in partition management job:', error);
-    } finally {
-      isPartitionJobRunning = false;
-    }
-  });
-
-  // Archive previous month on the 1st of each month at 3 AM
-  cron.schedule('0 3 1 * *', async () => {
-    if (isPartitionJobRunning) {
-      console.log('⚠ Partition job already running, skipping...');
-      return;
-    }
-
-    isPartitionJobRunning = true;
-
-    try {
-      console.log('\n📦 Running monthly archival job...');
-      await partitionManagerService.archivePreviousMonth();
-      console.log('✓ Monthly archival completed\n');
-    } catch (error) {
-      console.error('Error in monthly archival job:', error);
-    } finally {
-      isPartitionJobRunning = false;
-    }
-  });
-
-  console.log('✓ Partition management jobs scheduled:');
-  console.log('  - Create future partitions: 1st of month at 2 AM');
-  console.log('  - Archive completed months: 1st of month at 3 AM');
 }
 
 /**

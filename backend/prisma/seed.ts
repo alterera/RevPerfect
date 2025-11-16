@@ -11,8 +11,8 @@ async function main() {
     update: {},
     create: {
       name: 'Test Hotel',
-      email: 'testhotel@example.com',
-      totalAvailableRooms: 500,
+      email: 'iamasifakhtar@gmail.com',
+      totalAvailableRooms: 507,
       isActive: true,
     },
   });

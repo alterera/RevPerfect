@@ -1,8 +1,8 @@
 /**
  * Column Mapping for History Forecast Files
  * 
- * The files are tab-separated with 29 columns total.
- * We only extract 5 essential columns and calculate the rest.
+ * The files are tab-separated with 30 columns total (we skip column 0).
+ * We extract all 30 columns and store them as raw text.
  * Based on analysis of the sample file history_forecast99383127.txt
  * 
  * Date Format Conversion:
@@ -12,11 +12,36 @@
  */
 
 export const COLUMN_INDICES = {
-  DATA_TYPE: 1,        // "History" or "Forecast"
-  STAY_DATE: 2,        // Input: "DD/MM/YY Day" -> Output: YYYY-MM-DD
+  DATA_TYPE: 1,        // Column 1: "History" or "Forecast"
+  STAY_DATE: 2,        // Column 2: Input: "DD/MM/YY Day" -> Output: YYYY-MM-DD
   ROOM_NIGHTS: 3,      // Column 3: Room nights sold
+  COL_A: 4,            // Column 4
+  COL_B: 5,            // Column 5
+  COL_C: 6,            // Column 6
+  COL_D: 7,            // Column 7
+  COL_E: 8,            // Column 8
+  COL_F: 9,            // Column 9
   ROOM_REVENUE: 10,    // Column 10: Total room revenue
+  COL_G: 11,           // Column 11
+  COL_H: 12,           // Column 12
+  COL_I: 13,           // Column 13
+  COL_J: 14,           // Column 14
   OO_ROOMS: 15,        // Column 15: Out of order rooms
+  COL_K: 16,           // Column 16
+  COL_L: 17,           // Column 17
+  COL_M: 18,           // Column 18
+  COL_N: 19,           // Column 19
+  COL_O: 20,           // Column 20
+  COL_P: 21,           // Column 21
+  COL_Q: 22,           // Column 22
+  COL_R: 23,           // Column 23
+  COL_S: 24,           // Column 24
+  COL_T: 25,           // Column 25
+  COL_U: 26,           // Column 26
+  COL_V: 27,           // Column 27
+  COL_W: 28,           // Column 28
+  COL_X: 29,           // Column 29
+  COL_Y: 30,           // Column 30
 } as const;
 
 /**

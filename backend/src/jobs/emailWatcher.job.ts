@@ -181,6 +181,16 @@ export async function processEmails(): Promise<ProcessingSummary> {
                 `  ✓ Data saved successfully (${parsedRows.length} rows)`
               );
 
+              // Update seed snapshot with last 7 days history if applicable
+              const historyRows = parsedRows.filter((row) => row.dataType === 'HISTORY');
+              if (historyRows.length > 0) {
+                console.log(`  ⚙ Checking for seed snapshot override...`);
+                await snapshotService.updateSeedActualsWithHistory(
+                  hotel.id,
+                  parsedRows
+                );
+              }
+
               summary.snapshotsCreated++;
             } catch (parseError) {
               const errorMsg =

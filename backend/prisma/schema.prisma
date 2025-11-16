@@ -59,6 +59,7 @@ model HistoryForecastSnapshot {
   blobUrl                    String
   fileHash                   String           @unique
   totalAvailableRoomsSnapshot Int            // Rooms at calculation time
+  isSeedSnapshot             Boolean          @default(false) // True for onboarding seed data
   uploadedAt                 DateTime         @default(now())
   processed                  Boolean          @default(false)
   processingStatus           ProcessingStatus @default(PENDING)
@@ -74,20 +75,53 @@ model HistoryForecastSnapshot {
   @@index([fileHash])
   @@index([processed])
   @@index([processingStatus])
+  @@index([isSeedSnapshot])
   @@map("history_forecast_snapshots")
 }
 
 model HistoryForecastData {
   id         String   @id @default(uuid())
   snapshotId String
-  hotelId    String   // Denormalized for better query performance and partitioning
+  hotelId    String   // Denormalized for better query performance
   stayDate   DateTime @db.Date
   dataType   DataType
 
-  // 5 EXTRACTED columns from file
-  roomNights  Int              // Column 3: Room nights sold
-  roomRevenue Decimal  @db.Decimal(12, 2)  // Column 10: Room revenue
-  ooRooms     Int              // Column 15: Out of order rooms
+  // 30 EXTRACTED columns from file (stored as raw text)
+  col1  String?  // Column 1: Data Type
+  col2  String?  // Column 2: Stay Date
+  col3  String?  // Column 3: Room nights sold (roomNights)
+  col4  String?  // Column 4
+  col5  String?  // Column 5
+  col6  String?  // Column 6
+  col7  String?  // Column 7
+  col8  String?  // Column 8
+  col9  String?  // Column 9
+  col10 String?  // Column 10: Room revenue (roomRevenue)
+  col11 String?  // Column 11
+  col12 String?  // Column 12
+  col13 String?  // Column 13
+  col14 String?  // Column 14
+  col15 String?  // Column 15: Out of order rooms (ooRooms)
+  col16 String?  // Column 16
+  col17 String?  // Column 17
+  col18 String?  // Column 18
+  col19 String?  // Column 19
+  col20 String?  // Column 20
+  col21 String?  // Column 21
+  col22 String?  // Column 22
+  col23 String?  // Column 23
+  col24 String?  // Column 24
+  col25 String?  // Column 25
+  col26 String?  // Column 26
+  col27 String?  // Column 27
+  col28 String?  // Column 28
+  col29 String?  // Column 29
+  col30 String?  // Column 30
+
+  // Legacy numeric fields (for backward compatibility and calculations)
+  roomNights  Int              // Parsed from col3
+  roomRevenue Decimal  @db.Decimal(12, 2)  // Parsed from col10
+  ooRooms     Int              // Parsed from col15
 
   // 3 CALCULATED metrics (indexed for queries)
   occupancyPercent Decimal  @db.Decimal(5, 2)   // (roomNights / totalAvailable) * 100
@@ -102,12 +136,12 @@ model HistoryForecastData {
 
   @@unique([snapshotId, stayDate, dataType])
   @@index([snapshotId, stayDate])
-  @@index([hotelId, stayDate])      // Critical composite index for time-travel queries
-  @@index([stayDate])                // For partitioning key
+  @@index([hotelId, stayDate])
+  @@index([stayDate])
   @@index([dataType])
-  @@index([occupancyPercent])        // For filtering/sorting (only on active partitions)
-  @@index([adr])                     // For filtering/sorting (only on active partitions)
-  @@index([revPAR])                  // For filtering/sorting (only on active partitions)
+  @@index([occupancyPercent])
+  @@index([adr])
+  @@index([revPAR])
   @@map("history_forecast_data")
 }
 

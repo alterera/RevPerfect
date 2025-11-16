@@ -1,10 +1,10 @@
 import { prisma } from '../utils/prisma.js';
+import { Prisma } from '@prisma/client';
 import type { ParsedRow, SnapshotMetadata } from '../types/fileProcessor.types.js';
 import type {
   HistoryForecastSnapshot,
   HistoryForecastData,
 } from '@prisma/client';
-import { partitionManagerService } from './partitionManager.service.js';
 
 class SnapshotService {
   /**
@@ -37,11 +37,13 @@ class SnapshotService {
    * Create a snapshot record (Phase 1: Before parsing)
    * @param metadata - Snapshot metadata
    * @param totalAvailableRoomsSnapshot - Total available rooms at snapshot time
+   * @param isSeedSnapshot - Whether this is a seed snapshot (default: false)
    * @returns Created snapshot
    */
   async createSnapshotRecord(
     metadata: SnapshotMetadata,
-    totalAvailableRoomsSnapshot: number
+    totalAvailableRoomsSnapshot: number,
+    isSeedSnapshot: boolean = false
   ): Promise<HistoryForecastSnapshot> {
     try {
       const snapshot = await prisma.historyForecastSnapshot.create({
@@ -52,6 +54,7 @@ class SnapshotService {
           blobUrl: metadata.blobUrl,
           fileHash: metadata.fileHash,
           totalAvailableRoomsSnapshot,
+          isSeedSnapshot,
           uploadedAt: metadata.uploadedAt,
           processed: false,
           processingStatus: 'PENDING',
@@ -59,7 +62,7 @@ class SnapshotService {
       });
 
       console.log(
-        `Snapshot record created: ${snapshot.id} for hotel ${metadata.hotelId}`
+        `Snapshot record created: ${snapshot.id} for hotel ${metadata.hotelId} (seed: ${isSeedSnapshot})`
       );
       return snapshot;
     } catch (error) {
@@ -88,26 +91,6 @@ class SnapshotService {
         throw new Error(`Snapshot ${snapshotId} not found`);
       }
 
-      // Ensure partitions exist for all dates in the data (BEFORE transaction)
-      // Get unique months from the rows
-      const uniqueMonths = new Set<string>();
-      rows.forEach((row) => {
-        const monthStart = new Date(
-          row.stayDate.getFullYear(),
-          row.stayDate.getMonth(),
-          1
-        );
-        uniqueMonths.add(monthStart.toISOString());
-      });
-
-      // Ensure partitions exist for each month (must be done outside transaction)
-      console.log(`Ensuring partitions exist for ${uniqueMonths.size} unique months...`);
-      for (const monthStr of uniqueMonths) {
-        const monthDate = new Date(monthStr);
-        await partitionManagerService.ensurePartitionExists(monthDate);
-      }
-      console.log('✓ All required partitions are available');
-
       // Use transaction to ensure atomicity
       await prisma.$transaction(async (tx) => {
         // Update snapshot status to processing
@@ -116,18 +99,49 @@ class SnapshotService {
           data: { processingStatus: 'PROCESSING' },
         });
 
-        // Bulk insert data rows with hotelId
+        // Bulk insert data rows with hotelId (all 30 columns)
+        // Convert Decimal fields to Prisma Decimal type
         const dataRecords = rows.map((row) => ({
           snapshotId,
           hotelId: snapshot.hotelId,
           stayDate: row.stayDate,
           dataType: row.dataType,
+          col1: row.col1,
+          col2: row.col2,
+          col3: row.col3,
+          col4: row.col4,
+          col5: row.col5,
+          col6: row.col6,
+          col7: row.col7,
+          col8: row.col8,
+          col9: row.col9,
+          col10: row.col10,
+          col11: row.col11,
+          col12: row.col12,
+          col13: row.col13,
+          col14: row.col14,
+          col15: row.col15,
+          col16: row.col16,
+          col17: row.col17,
+          col18: row.col18,
+          col19: row.col19,
+          col20: row.col20,
+          col21: row.col21,
+          col22: row.col22,
+          col23: row.col23,
+          col24: row.col24,
+          col25: row.col25,
+          col26: row.col26,
+          col27: row.col27,
+          col28: row.col28,
+          col29: row.col29,
+          col30: row.col30,
           roomNights: row.roomNights,
-          roomRevenue: row.roomRevenue,
+          roomRevenue: new Prisma.Decimal(row.roomRevenue),
           ooRooms: row.ooRooms,
-          occupancyPercent: row.occupancyPercent,
-          adr: row.adr,
-          revPAR: row.revPAR,
+          occupancyPercent: new Prisma.Decimal(row.occupancyPercent),
+          adr: new Prisma.Decimal(row.adr),
+          revPAR: new Prisma.Decimal(row.revPAR),
           rowIndex: row.rowIndex,
         }));
 
@@ -151,11 +165,19 @@ class SnapshotService {
       );
     } catch (error) {
       console.error('Error saving snapshot data:', error);
+      
+      // Log full error details for debugging
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      
       // Mark snapshot as failed
-      await this.markSnapshotFailed(
-        snapshotId,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      const errorMessage = error instanceof Error 
+        ? `${error.message}${error.stack ? `\nStack: ${error.stack}` : ''}`
+        : 'Unknown error';
+      
+      await this.markSnapshotFailed(snapshotId, errorMessage);
       throw error;
     }
   }
@@ -292,6 +314,115 @@ class SnapshotService {
     } catch (error) {
       console.error('Error fetching latest snapshot:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Update seed snapshot actuals with history rows from hourly snapshot
+   * Only updates the last 7 days of history data if those dates exist in seed snapshot
+   * @param hotelId - Hotel ID
+   * @param historyRows - History rows from hourly snapshot (last 7 rows with dataType='HISTORY')
+   */
+  async updateSeedActualsWithHistory(
+    hotelId: string,
+    historyRows: ParsedRow[]
+  ): Promise<void> {
+    try {
+      // Find seed snapshot for this hotel
+      const seedSnapshot = await prisma.historyForecastSnapshot.findFirst({
+        where: {
+          hotelId,
+          isSeedSnapshot: true,
+          processed: true,
+          processingStatus: 'COMPLETED',
+        },
+        orderBy: { snapshotTime: 'asc' }, // Get the earliest seed snapshot
+      });
+
+      if (!seedSnapshot) {
+        console.log(`No seed snapshot found for hotel ${hotelId}, skipping override`);
+        return;
+      }
+
+      // Get last 7 rows with dataType='HISTORY'
+      const historyData = historyRows
+        .filter((row) => row.dataType === 'HISTORY')
+        .slice(-7); // Last 7 rows
+
+      if (historyData.length === 0) {
+        console.log('No history rows found in snapshot, skipping override');
+        return;
+      }
+
+      console.log(`Updating seed snapshot with ${historyData.length} history rows...`);
+
+      // Update each history row in seed snapshot if the date exists
+      let updatedCount = 0;
+      for (const historyRow of historyData) {
+        // Check if this stayDate exists in seed snapshot
+        const existingRow = await prisma.historyForecastData.findFirst({
+          where: {
+            snapshotId: seedSnapshot.id,
+            stayDate: historyRow.stayDate,
+            dataType: 'HISTORY',
+          },
+        });
+
+        if (existingRow) {
+          // Update the row with new values (convert Decimal fields)
+          await prisma.historyForecastData.update({
+            where: { id: existingRow.id },
+            data: {
+              col1: historyRow.col1,
+              col2: historyRow.col2,
+              col3: historyRow.col3,
+              col4: historyRow.col4,
+              col5: historyRow.col5,
+              col6: historyRow.col6,
+              col7: historyRow.col7,
+              col8: historyRow.col8,
+              col9: historyRow.col9,
+              col10: historyRow.col10,
+              col11: historyRow.col11,
+              col12: historyRow.col12,
+              col13: historyRow.col13,
+              col14: historyRow.col14,
+              col15: historyRow.col15,
+              col16: historyRow.col16,
+              col17: historyRow.col17,
+              col18: historyRow.col18,
+              col19: historyRow.col19,
+              col20: historyRow.col20,
+              col21: historyRow.col21,
+              col22: historyRow.col22,
+              col23: historyRow.col23,
+              col24: historyRow.col24,
+              col25: historyRow.col25,
+              col26: historyRow.col26,
+              col27: historyRow.col27,
+              col28: historyRow.col28,
+              col29: historyRow.col29,
+              col30: historyRow.col30,
+              roomNights: historyRow.roomNights,
+              roomRevenue: new Prisma.Decimal(historyRow.roomRevenue),
+              ooRooms: historyRow.ooRooms,
+              occupancyPercent: new Prisma.Decimal(historyRow.occupancyPercent),
+              adr: new Prisma.Decimal(historyRow.adr),
+              revPAR: new Prisma.Decimal(historyRow.revPAR),
+            },
+          });
+          updatedCount++;
+        } else {
+          console.log(
+            `Stay date ${historyRow.stayDate.toISOString()} not found in seed snapshot, skipping`
+          );
+        }
+      }
+
+      console.log(`✓ Updated ${updatedCount} rows in seed snapshot`);
+    } catch (error) {
+      console.error('Error updating seed actuals with history:', error);
+      // Don't throw - this is not critical, just log the error
     }
   }
 }

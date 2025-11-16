@@ -6,13 +6,9 @@ export const NAV_DATA = [
     items: [
       {
         title: "Dashboard",
+        url: "/",
         icon: Icons.HomeIcon,
-        items: [
-          {
-            title: "eCommerce",
-            url: "/",
-          },
-        ],
+        items: [],
       },
       {
         title: "Calendar",
@@ -37,6 +33,10 @@ export const NAV_DATA = [
           {
             title: "Form Layout",
             url: "/forms/form-layout",
+          },
+          {
+            title: "Seed Data",
+            url: "/forms/seed-upload",
           },
         ],
       },
