@@ -34,7 +34,7 @@ export function TopChannels({ className }: { className?: string }) {
       
       try {
         if (comparisonType === 'pickup') {
-          const data = await getTopChannels();
+  const data = await getTopChannels();
           setMonthlyData(data);
           
           // Pre-fetch all daily data for pickup comparison
@@ -148,16 +148,16 @@ export function TopChannels({ className }: { className?: string }) {
   }
 
   if (!hasData) {
-    return (
-      <div
-        className={cn(
-          "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
-          className,
-        )}
-      >
-        <h2 className="mb-4 text-body-2xlg font-bold text-dark dark:text-white">
-          Pickup Table
-        </h2>
+  return (
+    <div
+      className={cn(
+        "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
+        className,
+      )}
+    >
+      <h2 className="mb-4 text-body-2xlg font-bold text-dark dark:text-white">
+        Pickup Table
+      </h2>
         <div className="py-8 text-center text-gray-500">
           No data available. Make sure you have completed snapshots.
         </div>
@@ -182,19 +182,19 @@ export function TopChannels({ className }: { className?: string }) {
       </div>
 
       {comparisonType === 'pickup' ? (
-        <Table>
-          <TableHeader>
-            <TableRow className="border-none uppercase [&>th]:text-center">
-              <TableHead className="min-w-[120px] !text-left">Month</TableHead>
-              <TableHead>Occupancy</TableHead>
-              <TableHead className="!text-right">Rooms</TableHead>
-              <TableHead>ADR</TableHead>
-              <TableHead>Revenue</TableHead>
-              <TableHead>PU Rooms</TableHead>
-              <TableHead>PU ADR</TableHead>
-              <TableHead>PU Revenue</TableHead>
-            </TableRow>
-          </TableHeader>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-none uppercase [&>th]:text-center">
+            <TableHead className="min-w-[120px] !text-left">Month</TableHead>
+            <TableHead>Occupancy</TableHead>
+            <TableHead className="!text-right">Rooms</TableHead>
+            <TableHead>ADR</TableHead>
+            <TableHead>Revenue</TableHead>
+            <TableHead>PU Rooms</TableHead>
+            <TableHead>PU ADR</TableHead>
+            <TableHead>PU Revenue</TableHead>
+          </TableRow>
+        </TableHeader>
           <TableBody>
             {monthlyData.map((row: any, i: number) => {
               const puRooms = typeof row.puRooms === 'object' ? row.puRooms.value : row.puRooms;
@@ -212,7 +212,7 @@ export function TopChannels({ className }: { className?: string }) {
 
               return (
                 <>
-                  <TableRow
+            <TableRow
                     className={cn(
                       "text-center text-base font-medium text-dark dark:text-white",
                       isClickable && "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -251,7 +251,7 @@ export function TopChannels({ className }: { className?: string }) {
                       <TableRow key={`${row.month}-daily-header`} className="bg-gray-50 dark:bg-gray-800">
                         <TableCell colSpan={8} className="!text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2">
                           Daily Breakdown for {row.name}
-                        </TableCell>
+              </TableCell>
                       </TableRow>
                       {dailyRows.map((dailyRow: any, dailyIndex: number) => {
                         const dailyPuRooms = typeof dailyRow.pickup?.puRooms === 'object' ? dailyRow.pickup.puRooms.value : dailyRow.pickup?.puRooms || 0;
@@ -284,7 +284,7 @@ export function TopChannels({ className }: { className?: string }) {
                             </TableCell>
                             <TableCell className={dailyPuRevenueIsPositive ? "text-green-600" : dailyPuRevenue === 0 ? "text-gray-600" : "text-red-600"}>
                               {dailyPuRevenueIsPositive && dailyPuRevenue !== 0 ? "+" : ""}${standardFormat(dailyPuRevenue)}
-                            </TableCell>
+              </TableCell>
                           </TableRow>
                         );
                       })}
@@ -315,14 +315,7 @@ export function TopChannels({ className }: { className?: string }) {
             {allDailyData.map((row: any, i: number) => {
               let puRooms, puADR, puRevenue, puRoomsIsPositive, puADRIsPositive, puRevenueIsPositive;
               
-              if (comparisonType === 'pickup' && row.pickup) {
-                puRooms = typeof row.pickup.puRooms === 'object' ? row.pickup.puRooms.value : row.pickup.puRooms;
-                puADR = typeof row.pickup.puADR === 'object' ? row.pickup.puADR.value : row.pickup.puADR;
-                puRevenue = typeof row.pickup.puRevenue === 'object' ? row.pickup.puRevenue.value : row.pickup.puRevenue;
-                puRoomsIsPositive = typeof row.pickup.puRooms === 'object' ? row.pickup.puRooms.isPositive : puRooms >= 0;
-                puADRIsPositive = typeof row.pickup.puADR === 'object' ? row.pickup.puADR.isPositive : puADR >= 0;
-                puRevenueIsPositive = typeof row.pickup.puRevenue === 'object' ? row.pickup.puRevenue.isPositive : puRevenue >= 0;
-              } else if (comparisonType === 'actual-vs-snapshot' && row.difference) {
+              if (comparisonType === 'actual-vs-snapshot' && row.difference) {
                 puRooms = typeof row.difference.puRooms === 'object' ? row.difference.puRooms.value : row.difference.puRooms;
                 puADR = typeof row.difference.puADR === 'object' ? row.difference.puADR.value : row.difference.puADR;
                 puRevenue = typeof row.difference.puRevenue === 'object' ? row.difference.puRevenue.value : row.difference.puRevenue;
@@ -341,21 +334,15 @@ export function TopChannels({ className }: { className?: string }) {
                 puRoomsIsPositive = puADRIsPositive = puRevenueIsPositive = true;
               }
 
-              const displayRooms = comparisonType === 'pickup' 
-                ? row.snapshot2?.rooms || 0
-                : comparisonType === 'actual-vs-snapshot'
+              const displayRooms = comparisonType === 'actual-vs-snapshot'
                 ? row.snapshot?.rooms || 0
                 : row.latest?.rooms || 0;
               
-              const displayAdr = comparisonType === 'pickup'
-                ? row.snapshot2?.adr || 0
-                : comparisonType === 'actual-vs-snapshot'
+              const displayAdr = comparisonType === 'actual-vs-snapshot'
                 ? row.snapshot?.adr || 0
                 : row.latest?.adr || 0;
               
-              const displayRevenue = comparisonType === 'pickup'
-                ? row.snapshot2?.revenue || 0
-                : comparisonType === 'actual-vs-snapshot'
+              const displayRevenue = comparisonType === 'actual-vs-snapshot'
                 ? row.snapshot?.revenue || 0
                 : row.latest?.revenue || 0;
 
@@ -389,8 +376,8 @@ export function TopChannels({ className }: { className?: string }) {
                 </TableRow>
               );
             })}
-          </TableBody>
-        </Table>
+        </TableBody>
+      </Table>
       )}
     </div>
   );
