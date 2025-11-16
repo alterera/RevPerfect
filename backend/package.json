@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
+    "postinstall": "prisma generate",
     "setup-auth": "tsx src/setup-auth.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -35,13 +36,13 @@
     "dotenv": "^16.3.1",
     "express": "^5.1.0",
     "multer": "^2.0.2",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "prisma": "^6.19.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
     "@types/node-cron": "^3.0.11",
     "nodemon": "^3.0.2",
-    "prisma": "^6.19.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }
