@@ -8,7 +8,7 @@ import apiRoutes from './routes/api.js';
 
 // Create Express app
 const app = express();
-const API_PORT = process.env.PORT || 3001;
+const API_PORT = Number(process.env.PORT) || 3001;
 
 // Middleware
 app.use(express.json());
