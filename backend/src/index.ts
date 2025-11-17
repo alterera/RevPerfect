@@ -109,11 +109,13 @@ async function initialize(): Promise<void> {
     });
 
     // Step 5: Start the API server
-    app.listen(API_PORT, () => {
+    // Bind to 0.0.0.0 to accept connections from all interfaces (important for production)
+    app.listen(API_PORT, '0.0.0.0', () => {
       logger.info(`API server running on port ${API_PORT}`, {
         healthCheck: `/health`,
         readyCheck: `/ready`,
         apiRoutes: `/api`,
+        host: '0.0.0.0',
       });
     });
 
