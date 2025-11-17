@@ -1,4 +1,4 @@
-name: Build and Deploy Node API to Azure App Service (Prod)
+name: Build & Deploy RevPerfect Backend
 
 on:
   push:
@@ -17,40 +17,54 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '22.x'      # You use Node 22 locally
-          cache: 'npm'              # <—— ENABLE caching
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
+      # Install dependencies in project root
       - name: Install dependencies
-        working-directory: ./backend
         run: npm install
 
+      # Generate Prisma Client for build
       - name: Generate Prisma Client
-        working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx prisma generate
 
-      - name: Build TypeScript
-        working-directory: ./backend
+      # Build TypeScript
+      - name: Build project
         run: npm run build
 
-      - name: Prepare Deployment Package
+      # Prepare deployment folder
+      - name: Prepare deployment package
         run: |
           mkdir deploy
-          cp -r backend/dist deploy/dist
-          cp -r backend/prisma deploy/prisma
-          cp backend/package.json deploy/
-          cp backend/package-lock.json deploy/
 
+          # Copy JS build
+          cp -r dist deploy/dist
+
+          # Copy prisma folder (schema + migrations)
+          cp -r prisma deploy/prisma
+
+          # Copy root config files
+          cp package.json deploy/package.json
+          cp package-lock.json deploy/package-lock.json
+
+          # Install ONLY production deps inside deploy/
           cd deploy
-          npm install --omit=dev        # Install prod deps using cache
-          npx prisma generate           # Generate Prisma client again for deploy/
-          npx prisma migrate deploy     # Deploy migrations (optional)
+          npm install --omit=dev
+
+          # Generate Prisma Client again INSIDE deploy/
+          npx prisma generate
+
+          # Apply database migrations (optional)
+          npx prisma migrate deploy
           cd ..
 
+          # Create ZIP package
           zip -r deploy.zip deploy
 
-      - name: Upload artifact (ZIP)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: deploy-package
@@ -62,13 +76,13 @@ jobs:
     needs: build
 
     steps:
-      - name: Download deployment artifact
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: deploy-package
           path: .
 
-      - name: Debug — Show downloaded files
+      - name: Debug
         run: ls -R .
 
       - name: Deploy to Azure Web App
