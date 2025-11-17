@@ -1,4 +1,7 @@
-name: Build and deploy Node.js app to Azure Web App - RevPerfect-Backend
+# Alternative Azure Deployment Workflow
+# This version is more explicit about handling Prisma client
+
+name: Azure Deployment (Alternative)
 
 on:
   push:
@@ -6,73 +9,174 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  NODE_VERSION: '20.x'
+  AZURE_WEBAPP_NAME: 'revbackend'
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '22.x'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies and build
+      - name: Install dependencies
         working-directory: ./backend
-        run: |
-          npm install
-          npm run build
+        run: npm ci
 
-      - name: Prepare deployment package
-        run: |
-          mkdir deploy
-          cp -r backend/dist deploy/dist
-          cp -r backend/prisma deploy/prisma
-          cp backend/server.js deploy/server.js
-          cp backend/package.json deploy/
-          cp backend/package-lock.json deploy/
-
-      - name: Install production dependencies
-        working-directory: ./deploy
+      - name: Generate Prisma Client
+        working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          npm install --omit=dev
-          npx prisma generate
+        run: npx prisma generate
 
-      - name: Update package.json start script
-        working-directory: ./deploy
-        run: |
-          npm pkg set scripts.start="node server.js"
+      - name: Build TypeScript
+        working-directory: ./backend
+        run: npm run build
 
-      - name: Zip deployment package
+      - name: Verify Prisma client exists
+        working-directory: ./backend
+        run: |
+          echo "Checking Prisma client..."
+          ls -la node_modules/.prisma/client/ || echo "Warning: .prisma/client not found"
+          ls -la node_modules/@prisma/client/ || echo "Warning: @prisma/client not found"
+
+      - name: Create deployment package
+        run: |
+          echo "Creating deployment directory..."
+          mkdir -p deploy/dist
+          mkdir -p deploy/prisma
+          mkdir -p deploy/node_modules/.prisma
+          mkdir -p deploy/node_modules/@prisma
+          
+          echo "Copying built files..."
+          cp -r backend/dist/* deploy/dist/
+          
+          echo "Copying Prisma schema..."
+          cp -r backend/prisma/* deploy/prisma/
+          
+          echo "Copying generated Prisma client..."
+          cp -r backend/node_modules/.prisma/client deploy/node_modules/.prisma/
+          cp -r backend/node_modules/@prisma/client deploy/node_modules/@prisma/
+          
+          echo "Copying package files..."
+          cp backend/package.json deploy/
+          cp backend/package-lock.json deploy/
+          
+          echo "Installing production dependencies..."
+          cd deploy
+          npm ci --omit=dev --ignore-scripts
+          
+          echo "Verifying Prisma client in deploy folder..."
+          ls -la node_modules/.prisma/client/
+          ls -la node_modules/@prisma/client/
+
+      - name: Create .deployment config
+        run: |
+          cat > deploy/.deployment << 'EOF'
+          [config]
+          SCM_DO_BUILD_DURING_DEPLOYMENT=false
+          EOF
+          
+          echo "Created .deployment file:"
+          cat deploy/.deployment
+
+      - name: Create web.config for Azure
+        run: |
+          cat > deploy/web.config << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <system.webServer>
+              <handlers>
+                <add name="iisnode" path="dist/index.js" verb="*" modules="iisnode"/>
+              </handlers>
+              <rewrite>
+                <rules>
+                  <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
+                    <match url="^dist/index.js\/debug[\/]?" />
+                  </rule>
+                  <rule name="StaticContent">
+                    <action type="Rewrite" url="public{REQUEST_URI}"/>
+                  </rule>
+                  <rule name="DynamicContent">
+                    <conditions>
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
+                    </conditions>
+                    <action type="Rewrite" url="dist/index.js"/>
+                  </rule>
+                </rules>
+              </rewrite>
+              <security>
+                <requestFiltering>
+                  <hiddenSegments>
+                    <remove segment="bin"/>
+                  </hiddenSegments>
+                </requestFiltering>
+              </security>
+              <httpErrors existingResponse="PassThrough" />
+              <iisnode node_env="%NODE_ENV%"
+                       nodeProcessCommandLine="&quot;%programfiles%\nodejs\node.exe&quot;"
+                       loggingEnabled="true"
+                       debuggingEnabled="false"
+                       devErrorsEnabled="false" />
+            </system.webServer>
+          </configuration>
+          EOF
+
+      - name: Archive deployment package
         run: |
           cd deploy
-          zip -r ../deploy.zip .
+          zip -r ../deployment.zip . -x '*.git*'
+          cd ..
+          echo "Package size:"
+          ls -lh deployment.zip
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: deploy-package
-          path: deploy.zip
+          name: node-app
+          path: deployment.zip
+          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: 'production'
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          name: deploy-package
+          name: node-app
 
-      - name: Unzip deployment package
-        run: unzip deploy.zip -d deploy
+      - name: Extract deployment package
+        run: |
+          mkdir -p package
+          unzip deployment.zip -d package
+          echo "Package contents:"
+          ls -la package/
 
       - name: Deploy to Azure Web App
+        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'revbackend'
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: deploy
+          package: package
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting 30 seconds for app to start..."
+          sleep 30
+          echo "Checking health endpoint..."
+          curl -f https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health || echo "Health check failed - check Azure logs"
