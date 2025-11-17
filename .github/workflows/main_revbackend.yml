@@ -36,6 +36,7 @@ jobs:
           cp backend/package-lock.json deploy/
           cd deploy
           npm install --omit=dev
+          npx prisma generate
 
       - uses: actions/upload-artifact@v4
         with:
@@ -56,5 +57,6 @@ jobs:
         with:
           app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+
 
 
