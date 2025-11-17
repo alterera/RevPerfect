@@ -5,6 +5,7 @@ import { blobStorageService } from '../services/blobStorage.service.js';
 import { fileProcessorService } from '../services/fileProcessor.service.js';
 import { snapshotService } from '../services/snapshot.service.js';
 import { calculateFileHash } from '../utils/fileHash.js';
+import { logger } from '../utils/logger.js';
 
 interface ProcessingSummary {
   totalEmails: number;
@@ -30,29 +31,28 @@ export async function processEmails(): Promise<ProcessingSummary> {
   };
 
   try {
-    console.log('='.repeat(80));
-    console.log('Starting email processing job...');
-    console.log(`Timestamp: ${new Date().toISOString()}`);
-    console.log('='.repeat(80));
+    logger.info('Starting email processing job');
 
     // Step 1: Fetch new emails
     const emails = await emailService.getNewEmails();
     summary.totalEmails = emails.length;
 
     if (emails.length === 0) {
-      console.log('No new emails found.');
+      logger.info('No new emails found');
       return summary;
     }
 
-    console.log(`Found ${emails.length} new email(s) to process`);
+    logger.info(`Found ${emails.length} new email(s) to process`);
 
     // Step 2: Process each email
     for (const email of emails) {
       try {
-        console.log(`\nProcessing email: ${email.messageId}`);
-        console.log(`  From: ${email.sender}`);
-        console.log(`  Subject: ${email.subject}`);
-        console.log(`  Received: ${email.receivedAt.toISOString()}`);
+        logger.info('Processing email', {
+          messageId: email.messageId,
+          from: email.sender,
+          subject: email.subject,
+          received: email.receivedAt.toISOString(),
+        });
 
         // Check if already processed
         const isProcessed = await processedEmailService.isEmailProcessed(

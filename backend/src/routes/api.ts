@@ -6,6 +6,8 @@ import { blobStorageService } from '../services/blobStorage.service.js';
 import { fileProcessorService } from '../services/fileProcessor.service.js';
 import { calculateFileHash } from '../utils/fileHash.js';
 import { prisma } from '../utils/prisma.js';
+import { logger } from '../utils/logger.js';
+import { uploadRateLimiter } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -24,7 +26,7 @@ router.get('/hotels', async (_req, res) => {
     const hotels = await hotelService.getAllActiveHotels();
     res.json(hotels);
   } catch (error) {
-    console.error('Error fetching hotels:', error);
+    logger.error('Error fetching hotels', { error });
     res.status(500).json({ error: 'Failed to fetch hotels' });
   }
 });
@@ -41,7 +43,7 @@ router.get('/hotels/:hotelId/snapshots', async (req, res) => {
     const snapshots = await snapshotService.getSnapshotsByHotel(hotelId, limit);
     res.json(snapshots);
   } catch (error) {
-    console.error('Error fetching snapshots:', error);
+    logger.error('Error fetching snapshots', { error, hotelId: req.params.hotelId });
     res.status(500).json({ error: 'Failed to fetch snapshots' });
   }
 });
@@ -52,7 +54,7 @@ router.get('/hotels/:hotelId/snapshots', async (req, res) => {
  * Accepts multipart/form-data with 'file' field
  * Query params: onboardingDate (optional - defaults to current date)
  */
-router.post('/hotels/:hotelId/seed', upload.single('file'), async (req, res) => {
+router.post('/hotels/:hotelId/seed', uploadRateLimiter, upload.single('file'), async (req, res) => {
   try {
     const { hotelId } = req.params;
     const { onboardingDate } = req.query;
@@ -85,11 +87,16 @@ router.post('/hotels/:hotelId/seed', upload.single('file'), async (req, res) => 
 
     // Calculate file hash
     const fileHash = calculateFileHash(file.buffer);
-    console.log(`Seed file hash: ${fileHash.substring(0, 16)}...`);
+    logger.info('Processing seed file upload', { 
+      hotelId, 
+      filename: file.originalname,
+      fileHash: fileHash.substring(0, 16) 
+    });
 
     // Check for duplicate
     const existing = await snapshotService.checkDuplicateByHash(fileHash);
     if (existing) {
+      logger.warn('Duplicate file detected', { hotelId, existingSnapshotId: existing.id });
       return res.status(400).json({ 
         error: 'Duplicate file detected',
         existingSnapshotId: existing.id,
@@ -97,13 +104,13 @@ router.post('/hotels/:hotelId/seed', upload.single('file'), async (req, res) => 
     }
 
     // Upload to Azure Blob Storage
-    console.log('Uploading seed file to Azure Blob Storage...');
+    logger.info('Uploading seed file to Azure Blob Storage', { hotelId });
     const blobUrl = await blobStorageService.uploadFile(
       hotelId,
       file.originalname,
       file.buffer
     );
-    console.log(`Uploaded to: ${blobUrl}`);
+    logger.info('File uploaded successfully', { hotelId, blobUrl });
 
     // Parse onboarding date or use current date
     const snapshotTime = onboardingDate 
@@ -125,17 +132,17 @@ router.post('/hotels/:hotelId/seed', upload.single('file'), async (req, res) => 
     );
 
     // Parse file
-    console.log('Parsing seed file...');
+    logger.info('Parsing seed file', { snapshotId: snapshot.id });
     const parsedRows = fileProcessorService.parseHistoryForecastFile(
       file.buffer,
       hotel.totalAvailableRooms || 0
     );
-    console.log(`Parsed ${parsedRows.length} rows`);
+    logger.info('Seed file parsed', { snapshotId: snapshot.id, rowCount: parsedRows.length });
 
     // Save data
-    console.log('Saving seed data to database...');
+    logger.info('Saving seed data to database', { snapshotId: snapshot.id });
     await snapshotService.saveSnapshotData(snapshot.id, parsedRows);
-    console.log(`Saved ${parsedRows.length} rows`);
+    logger.info('Seed data saved successfully', { snapshotId: snapshot.id, rowCount: parsedRows.length });
 
     return res.json({
       success: true,
@@ -148,7 +155,11 @@ router.post('/hotels/:hotelId/seed', upload.single('file'), async (req, res) => 
       message: `Seed snapshot created successfully with ${parsedRows.length} rows`,
     });
   } catch (error) {
-    console.error('Error uploading seed snapshot:', error);
+    logger.error('Error uploading seed snapshot', { 
+      error,
+      hotelId: req.params.hotelId,
+      filename: req.file?.originalname 
+    });
     return res.status(500).json({ 
       error: 'Failed to upload seed snapshot',
       details: error instanceof Error ? error.message : 'Unknown error',
@@ -403,7 +414,7 @@ router.get('/pickup/:hotelId', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error calculating pickup:', error);
+    logger.error('Error calculating pickup', { error, hotelId: req.params.hotelId });
     return res.status(500).json({ error: 'Failed to calculate pickup' });
   }
 });
@@ -540,7 +551,7 @@ router.get('/pickup/:hotelId/daily', async (req, res) => {
       daily: dailyPickup,
     });
   } catch (error) {
-    console.error('Error calculating daily pickup:', error);
+    logger.error('Error calculating daily pickup', { error, hotelId: req.params.hotelId });
     return res.status(500).json({ error: 'Failed to calculate daily pickup' });
   }
 });
@@ -674,7 +685,7 @@ router.get('/comparison/:hotelId/actual-vs-snapshot', async (req, res) => {
       daily: dailyComparison,
     });
   } catch (error) {
-    console.error('Error calculating actual vs snapshot:', error);
+    logger.error('Error calculating actual vs snapshot', { error, hotelId: req.params.hotelId });
     return res.status(500).json({ error: 'Failed to calculate actual vs snapshot comparison' });
   }
 });
@@ -809,7 +820,7 @@ router.get('/comparison/:hotelId/stly', async (req, res) => {
       daily: stlyComparison,
     });
   } catch (error) {
-    console.error('Error calculating STLY comparison:', error);
+    logger.error('Error calculating STLY comparison', { error, hotelId: req.params.hotelId });
     return res.status(500).json({ error: 'Failed to calculate STLY comparison' });
   }
 });

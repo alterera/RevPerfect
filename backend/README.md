@@ -1,6 +1,6 @@
 # RevPerfect Backend - Hotel Revenue Optimization System
 
-Backend system for automated hotel revenue forecasting and analytics using Microsoft Graph API, Azure Blob Storage, and PostgreSQL.
+Production-ready backend system for automated hotel revenue forecasting and analytics using Microsoft Graph API, Azure Blob Storage, and PostgreSQL.
 
 ## Features
 
@@ -8,6 +8,9 @@ Backend system for automated hotel revenue forecasting and analytics using Micro
 - **Azure Blob Storage**: Securely stores all forecast files
 - **Snapshot-Based Architecture**: Creates immutable snapshots for time-series analysis
 - **Duplicate Detection**: File hash-based deduplication
+- **Production-Grade Security**: Helmet, CORS, rate limiting, and request validation
+- **Structured Logging**: Winston-based logging with rotation
+- **Docker Ready**: Multi-stage Docker builds with health checks
 - **Scalable Design**: Built with TypeScript, Prisma ORM, and PostgreSQL
 
 ## Architecture
@@ -111,29 +114,41 @@ Each hotel needs:
 - `email`: Sender email address (must match email sender)
 - `isActive`: true
 
-## Running the Application
+## Quick Start
 
 ### Development Mode
 
 ```bash
+# Install dependencies
+npm install
+
+# Setup environment
+cp env.example .env
+# Edit .env with your credentials
+
+# Run database migrations
+npm run prisma:generate
+npx prisma migrate dev
+
+# Start development server
 npm run dev
 ```
 
-This starts the application with auto-reload on file changes.
+### Production Deployment
 
-### Production Mode
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for comprehensive production deployment guide.
 
-```bash
-npm run build
-npm start
-```
-
-### Test File Parser
-
-Test the file parser with the sample file:
+**Quick production start with Docker**:
 
 ```bash
-npx tsx src/test-file-parser.ts
+# Build and start
+docker-compose up -d
+
+# Run migrations
+docker-compose exec backend npx prisma migrate deploy
+
+# Check logs
+docker-compose logs -f backend
 ```
 
 ## Database Schema

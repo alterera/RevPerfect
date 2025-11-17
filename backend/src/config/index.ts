@@ -57,7 +57,7 @@ function validateConfig(): Config {
         process.env.MONITORED_EMAIL || 'history.forecast@outlook.com',
     },
     scheduler: {
-      emailCheckCron: process.env.EMAIL_CHECK_CRON || '*/5 * * * *',
+      emailCheckCron: process.env.EMAIL_CHECK_CRON || '* * * * *',
     },
     database: {
       url: process.env.DATABASE_URL!,
