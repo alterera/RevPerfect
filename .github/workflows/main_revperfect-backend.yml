@@ -18,7 +18,8 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install, generate Prisma and build
+      # Install deps, generate Prisma client, build TS
+      - name: Install dependencies, generate Prisma client and build
         working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -27,11 +28,12 @@ jobs:
           npx prisma generate
           npm run build
 
-      - name: Prepare deploy package
+      # Prepare zip for Azure
+      - name: Prepare deployment package
         run: |
           mkdir deploy
           cp -r backend/dist deploy/dist
-          cp -r backend/node_modules deploy/node_modules
+          cp -r backend/prisma deploy/prisma
           cp backend/package.json deploy/
           cp backend/package-lock.json deploy/
 
