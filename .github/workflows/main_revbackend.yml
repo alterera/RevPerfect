@@ -34,14 +34,18 @@ jobs:
           cp -r backend/prisma deploy/prisma
           cp backend/package.json deploy/
           cp backend/package-lock.json deploy/
+
           cd deploy
           npm install --omit=dev
           npx prisma generate
+          cd ..
+
+          zip -r deploy.zip deploy
 
       - uses: actions/upload-artifact@v4
         with:
           name: deploy-package
-          path: deploy
+          path: deploy.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -57,6 +61,4 @@ jobs:
         with:
           app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-
-
-
+          package: deploy-package/deploy.zip
