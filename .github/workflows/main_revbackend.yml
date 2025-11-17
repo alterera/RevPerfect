@@ -1,4 +1,4 @@
-name: Build and deploy Node.js app to Azure Web App - RevPerfect-Backend
+name: Build and Deploy Node API to Azure App Service (Prod)
 
 on:
   push:
@@ -11,23 +11,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '22.x'
+          node-version: '22.x'      # You use Node 22 locally
+          cache: 'npm'              # <—— ENABLE caching
 
-      - name: Install dependencies, generate Prisma client and build
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm install
+
+      - name: Generate Prisma Client
         working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          npm install
-          npx prisma generate
-          npm run build
+        run: npx prisma generate
 
-      - name: Prepare deployment package
+      - name: Build TypeScript
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Prepare Deployment Package
         run: |
           mkdir deploy
           cp -r backend/dist deploy/dist
@@ -36,29 +43,37 @@ jobs:
           cp backend/package-lock.json deploy/
 
           cd deploy
-          npm install --omit=dev
-          npx prisma generate
+          npm install --omit=dev        # Install prod deps using cache
+          npx prisma generate           # Generate Prisma client again for deploy/
+          npx prisma migrate deploy     # Deploy migrations (optional)
           cd ..
 
           zip -r deploy.zip deploy
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact (ZIP)
+        uses: actions/upload-artifact@v4
         with:
           name: deploy-package
           path: deploy.zip
+
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download deployment artifact
+        uses: actions/download-artifact@v4
         with:
           name: deploy-package
+          path: .
+
+      - name: Debug — Show downloaded files
+        run: ls -R .
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: deploy-package/deploy.zip
+          package: ./deploy.zip
