@@ -1,7 +1,4 @@
-# Alternative Azure Deployment Workflow
-# This version is more explicit about handling Prisma client
-
-name: Azure Deployment (Alternative)
+name: Build and deploy Node.js app to Azure Web App - RevPerfect-Backend
 
 on:
   push:
@@ -9,63 +6,55 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  NODE_VERSION: '20.x'
-  AZURE_WEBAPP_NAME: 'revbackend'
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Setup Node.js
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          node-version: '22.x'
 
-      - name: Install dependencies
-        working-directory: ./backend
-        run: npm ci
-
-      - name: Generate Prisma Client
+      - name: Install dependencies, generate Prisma client and build
         working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma generate
-
-      - name: Build TypeScript
-        working-directory: ./backend
-        run: npm run build
-
-      - name: Verify Prisma client exists
+        run: |
+          npm install
+          npx prisma generate
+          npm run build
+      
+      - name: Verify Prisma client was generated
         working-directory: ./backend
         run: |
-          echo "Checking Prisma client..."
-          ls -la node_modules/.prisma/client/ || echo "Warning: .prisma/client not found"
-          ls -la node_modules/@prisma/client/ || echo "Warning: @prisma/client not found"
+          echo "Checking if Prisma client was generated..."
+          if [ ! -d "node_modules/.prisma/client" ]; then
+            echo "ERROR: .prisma/client directory not found!"
+            exit 1
+          fi
+          if [ ! -d "node_modules/@prisma/client" ]; then
+            echo "ERROR: @prisma/client directory not found!"
+            exit 1
+          fi
+          echo "✓ Prisma client found in backend/node_modules/.prisma/client/"
+          ls -la node_modules/.prisma/client/ | head -10
+          echo "✓ @prisma/client found in backend/node_modules/@prisma/client/"
+          ls -la node_modules/@prisma/client/ | head -10
 
-      - name: Create deployment package
+      - name: Prepare deployment package
         run: |
-          echo "Creating deployment directory..."
+          echo "Creating deployment structure..."
           mkdir -p deploy/dist
           mkdir -p deploy/prisma
-          mkdir -p deploy/node_modules/.prisma
-          mkdir -p deploy/node_modules/@prisma
           
-          echo "Copying built files..."
+          echo "Copying built application..."
           cp -r backend/dist/* deploy/dist/
           
           echo "Copying Prisma schema..."
           cp -r backend/prisma/* deploy/prisma/
-          
-          echo "Copying generated Prisma client..."
-          cp -r backend/node_modules/.prisma/client deploy/node_modules/.prisma/
-          cp -r backend/node_modules/@prisma/client deploy/node_modules/@prisma/
           
           echo "Copying package files..."
           cp backend/package.json deploy/
@@ -75,108 +64,48 @@ jobs:
           cd deploy
           npm ci --omit=dev --ignore-scripts
           
-          echo "Verifying Prisma client in deploy folder..."
-          ls -la node_modules/.prisma/client/
-          ls -la node_modules/@prisma/client/
-
-      - name: Create .deployment config
-        run: |
-          cat > deploy/.deployment << 'EOF'
-          [config]
-          SCM_DO_BUILD_DURING_DEPLOYMENT=false
-          EOF
+          echo "Copying pre-generated Prisma client..."
+          cd ..
+          mkdir -p deploy/node_modules/.prisma
+          mkdir -p deploy/node_modules/@prisma
+          cp -r backend/node_modules/.prisma/client deploy/node_modules/.prisma/
+          cp -r backend/node_modules/@prisma/client deploy/node_modules/@prisma/
           
-          echo "Created .deployment file:"
-          cat deploy/.deployment
+          echo "Verifying Prisma client..."
+          ls -la deploy/node_modules/.prisma/client/ || echo "WARNING: .prisma/client not found"
+          ls -la deploy/node_modules/@prisma/client/ || echo "WARNING: @prisma/client not found"
 
-      - name: Create web.config for Azure
-        run: |
-          cat > deploy/web.config << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <system.webServer>
-              <handlers>
-                <add name="iisnode" path="dist/index.js" verb="*" modules="iisnode"/>
-              </handlers>
-              <rewrite>
-                <rules>
-                  <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
-                    <match url="^dist/index.js\/debug[\/]?" />
-                  </rule>
-                  <rule name="StaticContent">
-                    <action type="Rewrite" url="public{REQUEST_URI}"/>
-                  </rule>
-                  <rule name="DynamicContent">
-                    <conditions>
-                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
-                    </conditions>
-                    <action type="Rewrite" url="dist/index.js"/>
-                  </rule>
-                </rules>
-              </rewrite>
-              <security>
-                <requestFiltering>
-                  <hiddenSegments>
-                    <remove segment="bin"/>
-                  </hiddenSegments>
-                </requestFiltering>
-              </security>
-              <httpErrors existingResponse="PassThrough" />
-              <iisnode node_env="%NODE_ENV%"
-                       nodeProcessCommandLine="&quot;%programfiles%\nodejs\node.exe&quot;"
-                       loggingEnabled="true"
-                       debuggingEnabled="false"
-                       devErrorsEnabled="false" />
-            </system.webServer>
-          </configuration>
-          EOF
-
-      - name: Archive deployment package
+      - name: Create .deployment file to disable Oryx build
         run: |
           cd deploy
-          zip -r ../deployment.zip . -x '*.git*'
-          cd ..
-          echo "Package size:"
-          ls -lh deployment.zip
+          echo "[config]" > .deployment
+          echo "SCM_DO_BUILD_DURING_DEPLOYMENT=false" >> .deployment
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Zip deployment package
+        run: |
+          cd deploy
+          zip -r ../deploy.zip .
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: node-app
-          path: deployment.zip
-          retention-days: 1
+          name: deploy-package
+          path: deploy.zip
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    environment:
-      name: 'Production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: node-app
+          name: deploy-package
 
-      - name: Extract deployment package
-        run: |
-          mkdir -p package
-          unzip deployment.zip -d package
-          echo "Package contents:"
-          ls -la package/
+      - name: Unzip deployment package
+        run: unzip deploy.zip -d deploy
 
       - name: Deploy to Azure Web App
-        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: package
-
-      - name: Verify deployment
-        run: |
-          echo "Waiting 30 seconds for app to start..."
-          sleep 30
-          echo "Checking health endpoint..."
-          curl -f https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health || echo "Health check failed - check Azure logs"
+          package: deploy
