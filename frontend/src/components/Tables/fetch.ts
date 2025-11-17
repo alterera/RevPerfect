@@ -72,7 +72,7 @@ export async function getInvoiceTableData() {
   ];
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://20.98.131.76';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function getHotelId(): Promise<string | null> {
   try {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import InputGroup from "@/components/FormElements/InputGroup";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://20.98.131.76';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface Hotel {
   id: string;
