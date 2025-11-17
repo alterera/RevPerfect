@@ -29,79 +29,22 @@ jobs:
           mkdir deploy
           cp -r backend/dist deploy/dist
           cp -r backend/prisma deploy/prisma
+          cp backend/server.js deploy/server.js
           cp backend/package.json deploy/
           cp backend/package-lock.json deploy/
-          
-          # Create Azure deployment configuration
-          cat > deploy/.deployment << 'EOF'
-[config]
-SCM_DO_BUILD_DURING_DEPLOYMENT = false
-EOF
-          
-          # Create web.config for proper routing
-          cat > deploy/web.config << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <system.webServer>
-    <handlers>
-      <add name="iisnode" path="server.js" verb="*" modules="iisnode"/>
-    </handlers>
-    <rewrite>
-      <rules>
-        <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
-          <match url="^server.js\/debug[\/]?" />
-        </rule>
-        <rule name="StaticContent">
-          <action type="Rewrite" url="public{REQUEST_URI}"/>
-        </rule>
-        <rule name="DynamicContent">
-          <conditions>
-            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
-          </conditions>
-          <action type="Rewrite" url="server.js"/>
-        </rule>
-      </rules>
-    </rewrite>
-    <iisnode watchedFiles="web.config;*.js"/>
-  </system.webServer>
-</configuration>
-EOF
-          
-          # Create a Node.js startup script
-          cat > deploy/server.js << 'EOF'
-const { execSync } = require('child_process');
 
-console.log('=== Starting RevPerfect Backend ===');
-console.log('Current directory:', process.cwd());
-console.log('Node version:', process.version);
-
-try {
-  console.log('Generating Prisma Client...');
-  execSync('npx prisma generate', { 
-    stdio: 'inherit',
-    cwd: process.cwd(),
-    env: process.env
-  });
-  console.log('✓ Prisma Client generated successfully');
-} catch (error) {
-  console.error('✗ Failed to generate Prisma Client:', error.message);
-  process.exit(1);
-}
-
-console.log('Starting application...');
-require('./dist/index.js');
-EOF
-
-      - name: Install production dependencies and generate Prisma client
+      - name: Install production dependencies
         working-directory: ./deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           npm install --omit=dev
           npx prisma generate
-          
-          # Update package.json to use server.js as entry point
-          node -e "const pkg = require('./package.json'); pkg.scripts.start = 'node server.js'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
+      - name: Update package.json start script
+        working-directory: ./deploy
+        run: |
+          npm pkg set scripts.start="node server.js"
 
       - name: Zip deployment package
         run: |
@@ -133,5 +76,3 @@ EOF
           app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: deploy
-        env:
-          SCM_DO_BUILD_DURING_DEPLOYMENT: false
