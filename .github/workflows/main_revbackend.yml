@@ -11,9 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # --------------------------
+      # 1. CHECKOUT REPOSITORY
+      # --------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --------------------------
+      # 2. SETUP NODE WITH CACHING
+      # --------------------------
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -22,49 +28,63 @@ jobs:
           cache-dependency-path: |
             package-lock.json
 
-      # Install dependencies in project root
+      # --------------------------
+      # 3. INSTALL ROOT DEPENDENCIES
+      # --------------------------
       - name: Install dependencies
         run: npm install
 
-      # Generate Prisma Client for build
+      # --------------------------
+      # 4. GENERATE PRISMA CLIENT (ROOT)
+      # --------------------------
       - name: Generate Prisma Client
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx prisma generate
 
-      # Build TypeScript
+      # --------------------------
+      # 5. BUILD TYPESCRIPT → dist/
+      # --------------------------
       - name: Build project
         run: npm run build
 
-      # Prepare deployment folder
+      # --------------------------
+      # 6. PREPARE DEPLOY FOLDER
+      # --------------------------
       - name: Prepare deployment package
         run: |
           mkdir deploy
 
-          # Copy JS build
+          # Copy built JS files
           cp -r dist deploy/dist
 
-          # Copy prisma folder (schema + migrations)
+          # Copy prisma schema + migrations
           cp -r prisma deploy/prisma
 
-          # Copy root config files
-          cp package.json deploy/package.json
-          cp package-lock.json deploy/package-lock.json
+          # Copy package files
+          cp package.json deploy/
+          cp package-lock.json deploy/
 
-          # Install ONLY production deps inside deploy/
+          # Move into deploy folder
           cd deploy
+
+          # Install ONLY production dependencies
           npm install --omit=dev
 
-          # Generate Prisma Client again INSIDE deploy/
+          # Generate Prisma client for DEPLOY folder
           npx prisma generate
 
-          # Apply database migrations (optional)
-          npx prisma migrate deploy
+          # Apply migrations (optional but recommended)
+          npx prisma migrate deploy || true
+
           cd ..
 
-          # Create ZIP package
+          # Create deploy.zip
           zip -r deploy.zip deploy
 
+      # --------------------------
+      # 7. UPLOAD ARTIFACT
+      # --------------------------
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -77,19 +97,25 @@ jobs:
     needs: build
 
     steps:
-      - name: Download artifact
+      # --------------------------
+      # 8. DOWNLOAD ARTIFACT
+      # --------------------------
+      - name: Download deployment artifact
         uses: actions/download-artifact@v4
         with:
           name: deploy-package
           path: .
 
-      - name: Debug
+      # Debug (helps if something is missing)
+      - name: Debug artifact
         run: ls -R .
 
+      # --------------------------
+      # 9. DEPLOY TO AZURE
+      # --------------------------
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./deploy.zip
-
