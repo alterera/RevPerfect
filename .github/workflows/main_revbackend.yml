@@ -1,4 +1,4 @@
-name: Build & Deploy RevPerfect Backend
+name: Build and deploy Node.js app to Azure Web App - RevPerfect-Backend
 
 on:
   push:
@@ -11,78 +11,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. CHECKOUT
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2. SETUP NODE (no cache)
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22.x'
 
-      # 3. INSTALL ROOT DEPENDENCIES
-      - name: Install dependencies
-        run: npm install
-
-      # 4. GENERATE PRISMA CLIENT (ROOT)
-      - name: Generate Prisma Client
+      - name: Install dependencies, generate Prisma client and build
+        working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma generate
+        run: |
+          npm install
+          npx prisma generate
+          npm run build
 
-      # 5. BUILD TYPESCRIPT
-      - name: Build project
-        run: npm run build
-
-      # 6. PREPARE DEPLOY FOLDER + ZIP
       - name: Prepare deployment package
         run: |
           mkdir deploy
-
-          # Copy built JS
-          cp -r dist deploy/dist
-          # Copy prisma schema + migrations
-          cp -r prisma deploy/prisma
-
-          cp package.json deploy/
-          cp package-lock.json deploy/
-
+          cp -r backend/dist deploy/dist
+          cp -r backend/prisma deploy/prisma
+          cp backend/package.json deploy/
+          cp backend/package-lock.json deploy/
           cd deploy
           npm install --omit=dev
-          npx prisma generate
-          npx prisma migrate deploy || true
-          cd ..
 
-          zip -r deploy.zip deploy
-
-      # 7. UPLOAD ARTIFACT
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: deploy-package
-          path: deploy.zip
-
+          path: deploy
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-      # 8. DOWNLOAD ARTIFACT
-      - name: Download artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: deploy-package
-          path: .
 
-      - name: Debug
-        run: ls -R .
-
-      # 9. DEPLOY TO AZURE
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'revbackend'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./deploy.zip
+          package: deploy-package
