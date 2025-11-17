@@ -8,20 +8,41 @@ import { logger } from '../utils/logger.js';
  * Configure CORS based on environment
  */
 export const configureCors = () => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  
+  // Default allowed origins
+  const defaultOrigins = isDevelopment 
+    ? ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000']
+    : ['http://localhost:3000'];
+
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
-    : ['http://localhost:3000'];
+    : defaultOrigins;
+
+  // Log CORS configuration on startup
+  logger.info('CORS Configuration', {
+    allowedOrigins,
+    environment: process.env.NODE_ENV || 'development',
+  });
 
   return cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
+      // Allow all origins in development if ALLOWED_ORIGINS is not set
+      if (isDevelopment && !process.env.ALLOWED_ORIGINS) {
+        // Allow localhost and 127.0.0.1 with any port
+        if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+          return callback(null, true);
+        }
+      }
+
       if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
         callback(null, true);
       } else {
-        logger.warn(`Blocked CORS request from origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
+        logger.warn(`Blocked CORS request from origin: ${origin}. Allowed origins: ${allowedOrigins.join(', ')}`);
+        callback(new Error(`Not allowed by CORS. Origin ${origin} is not in the allowed list.`));
       }
     },
     credentials: true,
