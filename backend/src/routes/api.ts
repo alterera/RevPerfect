@@ -238,11 +238,28 @@ router.get('/pickup/:hotelId', async (req, res) => {
       [snapshot1, snapshot2] = [snapshot2, snapshot1];
     }
 
-    // Get all forecast data for both snapshots
+    // Get HISTORY data for MTD calculations (MTD represents dates from start of month to today)
+    const mtdData1 = await prisma.historyForecastData.findMany({
+      where: {
+        snapshotId: snapshot1.id,
+        dataType: 'HISTORY',
+      },
+      orderBy: { stayDate: 'asc' },
+    });
+
+    const mtdData2 = await prisma.historyForecastData.findMany({
+      where: {
+        snapshotId: snapshot2.id,
+        dataType: 'HISTORY',
+      },
+      orderBy: { stayDate: 'asc' },
+    });
+
+    // Get FORECAST data for monthly comparisons (future dates)
     const data1 = await prisma.historyForecastData.findMany({
       where: {
         snapshotId: snapshot1.id,
-        // dataType: 'FORECAST',
+        dataType: 'FORECAST',
       },
       orderBy: { stayDate: 'asc' },
     });
@@ -250,23 +267,10 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const data2 = await prisma.historyForecastData.findMany({
       where: {
         snapshotId: snapshot2.id,
-        // dataType: 'FORECAST',
+        dataType: 'FORECAST',
       },
       orderBy: { stayDate: 'asc' },
     });
-
-    // Calculate MTD (Month-To-Date) pickup
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    // Filter MTD data for both snapshots
-    const mtdData1 = data1.filter(
-      (row) => row.stayDate >= startOfCurrentMonth && row.stayDate <= today
-    );
-    const mtdData2 = data2.filter(
-      (row) => row.stayDate >= startOfCurrentMonth && row.stayDate <= today
-    );
 
     // Calculate MTD metrics for snapshot1
     const roomsMTD1 = mtdData1.reduce((sum, row) => sum + Number(row.roomNights), 0);
@@ -286,6 +290,35 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const puRoomsMTD = roomsMTD2 - roomsMTD1;
     const puRevenueMTD = revenueMTD2 - revenueMTD1;
     const puADRMTD = adrMTD2 - adrMTD1;
+
+    // Debug payload for MTD calculation
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const mtdDebug = {
+      hotelId,
+      snapshot1Id: snapshot1.id,
+      snapshot2Id: snapshot2.id,
+      dataType: 'HISTORY', // MTD uses HISTORY data
+      mtdData1Count: mtdData1.length,
+      mtdData2Count: mtdData2.length,
+      roomsMTD1,
+      roomsMTD2,
+      revenueMTD1,
+      revenueMTD2,
+      adrMTD1,
+      adrMTD2,
+      totalRooms2,
+      occupancyMTD2,
+      puRoomsMTD,
+      puRevenueMTD,
+      puADRMTD,
+      startOfCurrentMonth: startOfCurrentMonth.toISOString(),
+      today: today.toISOString(),
+    };
+
+    logger.debug('MTD calculation debug payload', mtdDebug);
 
     // Create MTD pickup row
     const mtdPickup = {
@@ -411,6 +444,9 @@ router.get('/pickup/:hotelId', async (req, res) => {
       pickup: {
         mtd: mtdPickup,
         monthly: monthlyPickupData,
+      },
+      debug: {
+        mtd: mtdDebug,
       },
     });
   } catch (error) {
