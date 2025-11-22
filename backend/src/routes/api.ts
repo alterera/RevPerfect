@@ -259,7 +259,7 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const data1 = await prisma.historyForecastData.findMany({
       where: {
         snapshotId: snapshot1.id,
-        dataType: 'FORECAST',
+        // dataType: 'FORECAST',
       },
       orderBy: { stayDate: 'asc' },
     });
@@ -267,7 +267,7 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const data2 = await prisma.historyForecastData.findMany({
       where: {
         snapshotId: snapshot2.id,
-        dataType: 'FORECAST',
+        // dataType: 'FORECAST',
       },
       orderBy: { stayDate: 'asc' },
     });
