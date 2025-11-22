@@ -242,7 +242,7 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const data1 = await prisma.historyForecastData.findMany({
       where: {
         snapshotId: snapshot1.id,
-        dataType: 'FORECAST',
+        // dataType: 'FORECAST',
       },
       orderBy: { stayDate: 'asc' },
     });
@@ -250,7 +250,7 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const data2 = await prisma.historyForecastData.findMany({
       where: {
         snapshotId: snapshot2.id,
-        dataType: 'FORECAST',
+        // dataType: 'FORECAST',
       },
       orderBy: { stayDate: 'asc' },
     });
@@ -280,7 +280,7 @@ router.get('/pickup/:hotelId', async (req, res) => {
     const revenueMTD2 = mtdData2.reduce((sum, row) => sum + Number(row.roomRevenue), 0);
     const adrMTD2 = roomsMTD2 > 0 ? revenueMTD2 / roomsMTD2 : 0;
     const totalRooms2 = snapshot2.totalAvailableRoomsSnapshot || 0;
-    const occupancyMTD2 = totalRooms2 > 0 ? (roomsMTD2 / totalRooms2) * 100 : 0;
+    const occupancyMTD2 = totalRooms2 > 0 ? (roomsMTD2 / totalRooms2 * 31) * 100 : 0;
 
     // Calculate MTD pickup
     const puRoomsMTD = roomsMTD2 - roomsMTD1;

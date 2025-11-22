@@ -72,7 +72,16 @@ export async function getInvoiceTableData() {
   ];
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = "http://localhost:3001";
+
+export type PickupDebugInfo = {
+  mtd?: Record<string, unknown>;
+} | null;
+
+export type PickupTableResponse = {
+  rows: any[];
+  debug: PickupDebugInfo;
+};
 
 export async function getHotelId(): Promise<string | null> {
   try {
@@ -113,12 +122,12 @@ export async function getFullPickupData() {
   }
 }
 
-export async function getTopChannels() {
+export async function getTopChannels(): Promise<PickupTableResponse> {
   try {
     const pickupData = await getFullPickupData();
     
     if (!pickupData) {
-      return [];
+      return { rows: [], debug: null };
     }
 
     // Combine MTD and monthly data, with MTD first
@@ -132,10 +141,13 @@ export async function getTopChannels() {
       allPickupData.push(...pickupData.pickup.monthly);
     }
 
-    return allPickupData;
+    return {
+      rows: allPickupData,
+      debug: pickupData.debug ?? null,
+    };
   } catch (error) {
     console.error('Error fetching pickup data:', error);
-    return [];
+    return { rows: [], debug: null };
   }
 }
 

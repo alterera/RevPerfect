@@ -1,10 +1,34 @@
+'use client';
+
 import { cn } from "@/lib/utils";
 import * as React from "react";
 
+type TableProps = React.HTMLAttributes<HTMLTableElement> & {
+  debugLabel?: string;
+  debugData?: unknown;
+};
+
 export function Table({
   className,
+  debugLabel,
+  debugData,
   ...props
-}: React.HTMLAttributes<HTMLTableElement>) {
+}: TableProps) {
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (debugData === undefined || debugData === null) {
+      return;
+    }
+
+    const label = debugLabel || "Table debug";
+    console.groupCollapsed(`[Table] ${label}`);
+    console.log(debugData);
+    console.groupEnd();
+  }, [debugData, debugLabel]);
+
   return (
     <div className="relative w-full overflow-auto">
       <table

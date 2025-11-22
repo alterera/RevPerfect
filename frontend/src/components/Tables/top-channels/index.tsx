@@ -26,6 +26,7 @@ export function TopChannels({ className }: { className?: string }) {
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tableDebug, setTableDebug] = useState<any>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -34,8 +35,9 @@ export function TopChannels({ className }: { className?: string }) {
       
       try {
         if (comparisonType === 'pickup') {
-  const data = await getTopChannels();
-          setMonthlyData(data);
+          const data = await getTopChannels();
+          setMonthlyData(data.rows);
+          setTableDebug(data.debug?.mtd ?? null);
           
           // Pre-fetch all daily data for pickup comparison
           const dailyData = await getDailyPickup();
@@ -45,6 +47,7 @@ export function TopChannels({ className }: { className?: string }) {
         } else {
           // For other comparison types, fetch daily data
           setMonthlyData([]);
+          setTableDebug(null);
           let data: any = null;
           
           if (comparisonType === 'actual-vs-snapshot') {
@@ -182,7 +185,7 @@ export function TopChannels({ className }: { className?: string }) {
       </div>
 
       {comparisonType === 'pickup' ? (
-      <Table>
+      <Table debugLabel="MTD formula" debugData={tableDebug}>
         <TableHeader>
           <TableRow className="border-none uppercase [&>th]:text-center">
             <TableHead className="min-w-[120px] !text-left">Month</TableHead>
